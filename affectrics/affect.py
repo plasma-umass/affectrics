@@ -1,3 +1,11 @@
+import textblob
+import unittest
+
+def sentiment(string):
+    assert isinstance(string, basestring)
+    blob = textblob.Textblob(string)
+    return (blob.sentiment.subjectivity, blob.sentiment.polarity)
+
 def extract_comments(fstring):
     comments = []
 
