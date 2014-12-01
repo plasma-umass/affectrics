@@ -1,9 +1,23 @@
 import textblob
 import unittest
 
+def affect_callback(repores, repo, i, c):
+    sentiments = []
+    for name, blob in repores.files_of_commit(repo, c):
+        if not name.endswith('.java'): continue
+        for comment in extract_comments(blob.data.decode()):
+            sentiments.append(sentiment(comment))
+    N = len(sentiments)
+    if N == 0:
+        return {'avg_subjectivity': 0, 'avg_polarity': 0}
+    return {
+        'avg_subjectivity': sum(subj for (subj, pol) in sentiments) / N,
+        'avg_polarity': sum(pol for (subj, pol) in sentiments) / N
+    }
+
 def sentiment(string):
-    assert isinstance(string, basestring)
-    blob = textblob.Textblob(string)
+    assert isinstance(string, str)
+    blob = textblob.TextBlob(string)
     return (blob.sentiment.subjectivity, blob.sentiment.polarity)
 
 def extract_comments(fstring):

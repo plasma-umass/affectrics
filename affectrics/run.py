@@ -1,17 +1,18 @@
 """
 Code for running affectrics over a project.
 """
-import argparse
-import itertools as itls
 import subprocess
 import tempfile
 import unittest
-import sys
 
+from functools import partial
 from os import path
 
 from diligence import experiment as exp
-from diligence import tasks as task
+from diligence import tasks 
+
+from . import affect
+from . import metrics
 
 class GitHubProject(exp.RepoResource):
     def __init__(self, path):
@@ -55,40 +56,60 @@ class TestGitHubProject(unittest.TestCase):
 
 class AffectricsExperiment(object):
     def __init__(self, repos, callbacks, taskrunner=None):
+        """Callbacks should return rows in a CSV, so a name and a
+        value of the same type.
+
+        """
         assert all(callable(c) for c in callbacks)
         self.callbacks = callbacks
         self.repos = [GitHubProject(p) for p in repos]
         if taskrunner is None:
-            taskrunner = task.ThreadTaskRunner
+            taskrunner = tasks.ThreadTaskRunner
         self.taskrunner = taskrunner()
 
     def run(self):
         all_tasks = []
         for r in self.repos:
-            for mapres in r.map(self.make_tasks):
-               for t in mapres:
-                   assert isinstance(t, task.Task), t
-                   all_tasks.append(t)
+            for t in r.map(self.make_tasks):
+                if t is None: continue
+                assert isinstance(t, tasks.Task), t
+                all_tasks.append(t)
             
-        assert all(isinstance(t, task.Task) for t in all_tasks), all_tasks
+        assert all(isinstance(t, tasks.Task) for t in all_tasks), all_tasks
 
         results = self.taskrunner.run_tasks(all_tasks)
         return self.postprocess(results)
         
-    def make_tasks(self, repo, i, c):
-        return [task.Task(lambda: callback(repo, i, c),
-                          passon = {'repo': repo, 'count': i,
-                                    'commit': c})
-                for callback in self.callbacks]
+    def make_tasks(self, reporesource, repo, i, c):
+        if len(c.parents) > 1: return None
 
+        return tasks.Task(partial(self.run_callbacks,
+                                  reporesource, repo, i, c),
+                          passon = {'reporesource': reporesource,
+                                    'repo': repo, 'count': i,
+                                    'commit': c})
 
     def postprocess(self, results):
         return results
-    
+
+    def run_callbacks(self, repres, repo, i, c):
+        """Run the callbacks and return a mixed dictionary of
+        results.
+
+        """
+        results = {}
+        for cb in self.callbacks:
+            results.update(cb(repres, repo, i, c))
+        return results
+
 
 def main():
     exp = AffectricsExperiment(
-        ['https://github.com/WhisperSystems/TextSecure.git'],
-        [lambda r,i,c: c.message]
+        ['/tmp/tmp1f9sv11b'],
+        # ['/home/tedks/Projects/Java/'
+        #  'android-time-tracking/android-time-tracking'],
+        [affect.affect_callback,
+         metrics.complexity_callback],
+        # taskrunner = tasks.TaskRunner
     )
     return exp.run()
