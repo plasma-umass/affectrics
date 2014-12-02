@@ -2,12 +2,14 @@
 Code for running affectrics over a project.
 """
 import argparse
+import csv
 import subprocess
 import tempfile
 import unittest
 
 from functools import partial
 from os import path
+from time import time
 
 from diligence import experiment as exp
 from diligence import tasks 
@@ -56,7 +58,7 @@ class TestGitHubProject(unittest.TestCase):
 
 
 class AffectricsExperiment(object):
-    def __init__(self, repos, callbacks, taskrunner=None):
+    def __init__(self, repos, callbacks, taskrunner=None, commit_range=None):
         """Callbacks should return rows in a CSV, so a name and a
         value of the same type.
 
@@ -67,6 +69,9 @@ class AffectricsExperiment(object):
         if taskrunner is None:
             taskrunner = tasks.ThreadTaskRunner
         self.taskrunner = taskrunner()
+        self.results = []
+        self.commit_range = commit_range
+        
 
     def run(self):
         all_tasks = []
@@ -83,14 +88,25 @@ class AffectricsExperiment(object):
         
     def make_tasks(self, reporesource, repo, i, c):
         if len(c.parents) > 1: return None
+        if self.commit_range is not None:
+            start, end = self.commit_range
+            if not (start <= i < end):
+                return None
 
         return tasks.Task(partial(self.run_callbacks,
                                   reporesource, repo, i, c),
-                          passon = {'reporesource': reporesource,
-                                    'repo': repo, 'count': i,
-                                    'commit': c})
+                          passon = {'count': i,
+                                    'commit_id': str(c.id)})
 
     def postprocess(self, results):
+        outf_name = "run-{}.csv".format(time())
+        outf = open(outf_name, "w")
+        dw = csv.DictWriter(outf, ['count', 'commit_id',
+                                   'avg_complexity',
+                                   'avg_subjectivity', 'avg_polarity'],
+                            extrasaction='ignore')
+        dw.writeheader()
+        dw.writerows(results)
         return results
 
     def run_callbacks(self, repres, repo, i, c):
@@ -99,21 +115,44 @@ class AffectricsExperiment(object):
 
         """
         results = {}
+
+        if i % 10 == 0:
+            print("Started commit {}".format(i))
+
         for cb in self.callbacks:
-            results.update(cb(repres, repo, i, c))
+            files = repres.files_of_commit(repo, c)
+            results.update(cb(repres, repo, i, c, files=files))
+
+        if i % 10 == 0:
+            print("Finished commit {}".format(i))
+
+        self.results.append(results)
         return results
 
-
-def main():
+def main(commit_range=None):
+    global exp
     parser = argparse.ArgumentParser()
     parser.add_argument("repo", "r", type=str, 
                         help=("Repositories to analyze. "
                               "Can be a local path or a remote GIT url."))
     args = parser.parse_args()
+
+
     exp = AffectricsExperiment(
         [args.repo],
-        [affect.affect_callback,
-         metrics.complexity_callback],
-        # taskrunner = tasks.TaskRunner
+        # ['https://github.com/WhisperSystems/TextSecure.git'], # orig
+        ['/tmp/tmp52738046'], # tesla
+        # ['/tmp/tmp1f9sv11b'], # anglachel
+        # ['/home/tedks/Projects/Java/'
+        #  'android-time-tracking/android-time-tracking'],
+        [
+            affect.affect_callback,
+            metrics.complexity_callback
+     ],
+        # taskrunner = tasks.Thread
+        commit_range=commit_range
     )
-    return exp.run()
+    try:
+        return exp.run()
+    except KeyboardInterrupt:
+        return exp

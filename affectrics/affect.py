@@ -1,13 +1,17 @@
 import textblob
 import unittest
 
-def affect_callback(repores, repo, i, c):
+def affect_callback(repores, repo, i, c, files=None):
     sentiments = []
-    for name, blob in repores.files_of_commit(repo, c):
+    if files is None:
+        files = repores.files_of_commit(repo, c)
+    for name, blob in files:
         if not name.endswith('.java'): continue
         for comment in extract_comments(blob.data.decode()):
             sentiments.append(sentiment(comment))
     N = len(sentiments)
+    if i % 10 == 0:
+        print("Affect analysis completed at commit {}".format(i))
     if N == 0:
         return {'avg_subjectivity': 0, 'avg_polarity': 0}
     return {
