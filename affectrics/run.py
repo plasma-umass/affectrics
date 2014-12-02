@@ -141,7 +141,7 @@ def main(commit_range=None):
     exp = AffectricsExperiment(
         [args.repo],
         # ['https://github.com/WhisperSystems/TextSecure.git'], # orig
-        ['/tmp/tmp52738046'], # tesla
+        # ['/tmp/tmp52738046'], # tesla
         # ['/tmp/tmp1f9sv11b'], # anglachel
         # ['/home/tedks/Projects/Java/'
         #  'android-time-tracking/android-time-tracking'],
