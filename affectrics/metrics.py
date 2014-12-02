@@ -3,11 +3,17 @@ import subprocess
 
 from io import StringIO
 
-def complexity_callback(repores, repo, i, c):
+def complexity_callback(repores, repo, i, c, files=None):
     complexities = []
-    for name, blob in repores.files_of_commit(repo, c):
+    if files is None:
+        files = repores.files_of_commit(repo, c)
+    for name, blob in files:
         if not name.endswith('.java'): continue
         complexities.append(complexity(blob.data))
+    if i % 10 == 0:
+        print("Complexity analysis completed at commit {}".format(i))
+
+
     N = len(complexities)
     return {'avg_complexity': (sum(complexities) / N
                                if N > 0 else 0)}
