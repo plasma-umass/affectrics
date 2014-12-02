@@ -1,6 +1,7 @@
 """
 Code for running affectrics over a project.
 """
+import argparse
 import subprocess
 import tempfile
 import unittest
@@ -104,10 +105,13 @@ class AffectricsExperiment(object):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("repo", "r", type=str, 
+                        help=("Repositories to analyze. "
+                              "Can be a local path or a remote GIT url."))
+    args = parser.parse_args()
     exp = AffectricsExperiment(
-        ['/tmp/tmp1f9sv11b'],
-        # ['/home/tedks/Projects/Java/'
-        #  'android-time-tracking/android-time-tracking'],
+        [args.repo],
         [affect.affect_callback,
          metrics.complexity_callback],
         # taskrunner = tasks.TaskRunner
