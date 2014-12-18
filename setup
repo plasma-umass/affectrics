@@ -1,0 +1,26 @@
+#!/bin/sh
+
+PACKAGES="textblob git+ssh://git@github.com/musiKk/plyj.git pygit2"
+IMPORTS="textblob, plyj, pygit2"
+
+PYTHON_VERSION="3.4"
+
+if [ ! `which python${PYTHON_VERSION}` ]; then
+    echo "Requires python 3.4; please install via your system package manager"
+    exit 1
+fi
+
+virtualenv -p `which python${PYTHON_VERSION}` env
+
+for i in ${PACKAGES}; do
+    env/bin/pip install $i
+done
+
+if ( `env/bin/python -c "import textblob; import ${IMPORTS}"`); then
+    echo "Setup completed successfully"
+    exit 0
+else
+    echo "Setup did not complete successfully :-("
+    exit 1
+fi
+    
